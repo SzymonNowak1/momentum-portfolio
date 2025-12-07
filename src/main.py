@@ -64,21 +64,21 @@ def main():
     # ========================================================
     # 2. STRATEGIA B — MOMENTUM TOP 5
     # ========================================================
-print("\n[B] Obliczam ranking momentum dla US...")
+    print("\n[B] Obliczam ranking momentum dla US...")
 
-# 1. Ładuję dane dla wszystkich tickerów
-universe = load_universe()
-price_data = load_price_history(universe, today)
+    # 1. Ładuję dane dla wszystkich tickerów
+    universe = load_universe()
+    price_data = load_price_history(universe, today)
 
-# 2. Liczę TOP5 momentum
-top5 = compute_top5_momentum(price_data)
+    # 2. Liczę TOP5 momentum
+    top5 = compute_top5_momentum(price_data)
 
-print("[B] TOP5 momentum:", top5)
+    print("[B] TOP5 momentum:", top5)
 
     # ========================================================
     # 3. FX RATES
     # ========================================================
-fx_row = load_fx_row()
+    fx_row = load_fx_row()
     print("[FX] Dzisiejsze kursy:")
     print(fx_row, "\n")
 
