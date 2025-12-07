@@ -7,6 +7,9 @@ from portfolio import build_target_allocation
 from db import init_db
 
 def main():
+    init_db()
+    print("[DB] SQLite portfolio database initialized.")
+    
     print("=== Momentum Portfolio Engine V1 ===")
 
     # --- 1. Strategia A: filtr SP500 (SPY) ---
