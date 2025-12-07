@@ -159,7 +159,13 @@ def main():
         print("\n[BUY] Target allocation:")
         print(alloc_df)
 
-        print("\n[BUY] ✨ Tu w kolejnych krokach dodamy wykonywanie BUY transaction ✨\n")
+        # wykonujemy zakupy
+        buy_according_to_allocation(
+            today=today,
+            alloc_df=alloc_df,
+            fx_row=fx_row,
+            price_data=price_data
+        )
     else:
         print("[BUY] Dziś NIE jest dzień rebalancingu.\n")
 
