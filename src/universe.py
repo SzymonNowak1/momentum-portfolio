@@ -1,19 +1,24 @@
-def get_us_universe():
+import pandas as pd
+
+
+def load_universe():
     """
-    Tymczasowy zestaw dużych spółek US (proxy SP500 growth).
-    Później podmienimy na pełną listę SP500.
+    Zwraca listę tickerów wykorzystywanych w strategii momentum (Strategy B).
+    Możesz dowolnie rozszerzyć wszechświat akcji.
     """
-    return [
+
+    # US mega-cap momentum universe
+    tickers = [
         "AAPL",
         "MSFT",
         "NVDA",
-        "META",
         "GOOGL",
         "AMZN",
         "AVGO",
-        "COST",
-        "ADBE",
-        "ORLY",
+        "META",
         "LLY",
         "JPM",
+        "TSLA"
     ]
+
+    return tickers
