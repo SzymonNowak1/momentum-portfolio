@@ -1,7 +1,7 @@
 def get_us_universe():
     """
-    Tymczasowy, przykładowy zestaw spółek z SP500 do testów.
-    Później można tu podpiąć pełną listę SP500.
+    Tymczasowy zestaw dużych spółek US (proxy SP500 growth).
+    Później podmienimy na pełną listę SP500.
     """
     return [
         "AAPL",
