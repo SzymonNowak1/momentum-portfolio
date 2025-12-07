@@ -2,22 +2,74 @@ name: Weekly Rebalance Test
 
 on:
   schedule:
-    - cron: '0 7 * * 1'   # poniedziałek 07:00 UTC
-  workflow_dispatch:       # możliwość ręcznego odpalenia z UI
+    - cron: "0 8 * * 1"   # co poniedziałek o 08:00 UTC
+  workflow_dispatch:
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
+      # === NEW PART ===
+      - name: Try downloading previous DB artifact
+        uses: actions/download-artifact@v3
+        continue-on-error: true
+        with:
+          name: portfolio-db
+          path: data/
+
+      - name: Ensure DB exists
+        run: |
+          if [ ! -f data/portfolio.db ]; then
+            echo "No previous DB found. Creating empty DB..."
+            python - << 'EOF'
+import sqlite3
+conn = sqlite3.connect("data/portfolio.db")
+conn.execute("""
+CREATE TABLE IF NOT EXISTS portfolio (
+    ticker TEXT,
+    currency TEXT,
+    shares REAL,
+    avg_price REAL,
+    last_update TEXT
+)
+""")
+conn.execute("""
+CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticker TEXT,
+    action TEXT,
+    shares REAL,
+    price REAL,
+    currency TEXT,
+    fx REAL,
+    timestamp TEXT
+)
+""")
+conn.close()
+EOF
+          fi
+
+      # === Run main logic ===
       - name: Run main.py
         run: python src/main.py
+
+      # === Upload updated DB ===
+      - name: Upload updated portfolio database
+        uses: actions/upload-artifact@v3
+        with:
+          name: portfolio-db
+          path: data/portfolio.db
