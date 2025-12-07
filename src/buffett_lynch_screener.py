@@ -3,12 +3,13 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from buffett_lynch_portfolio import build_portfolio
+
+
 # =============================================================
-# UNIVERSE – na start możesz wrzucić tu S&P100 / swoje tickery
+# UNIVERSE – możesz później podmienić na dynamiczne TOP100
 # =============================================================
 
 UNIVERSE_TICKERS = [
-    # Na razie przykładowy zestaw dużych spółek – ZMIEŃ / ROZBUDUJ
     "AAPL", "MSFT", "GOOGL", "AMZN", "META",
     "NVDA", "BRK-B", "JPM", "JNJ", "XOM",
     "PG", "HD", "V", "MA", "AVGO",
@@ -37,28 +38,21 @@ def safe_get(info: dict, key: str, default=np.nan):
 
 
 def percentile_rank(series: pd.Series, higher_is_better=True) -> pd.Series:
-    """Zamienia serię na percentyle 0–100."""
     if series.nunique() <= 1:
         return pd.Series(50.0, index=series.index)
 
     if higher_is_better:
-        return series.rank(pct=True) * 100.0
+        return series.rank(pct=True) * 100
     else:
-        # niższa wartość = lepiej
-        return (1.0 - series.rank(pct=True)) * 100.0
+        return (1 - series.rank(pct=True)) * 100
 
 
 # =============================================================
-# POBIERANIE FUNDAMENTÓW Z YFINANCE
+# FUNDAMENTALS
 # =============================================================
 
 def fetch_fundamentals(tickers):
-    """
-    Pobiera podstawowe dane fundamentalne z yfinance.Ticker.info.
-    UWAGA: to są DANE BIEŻĄCE, nie historyczne!
-    """
     records = []
-
     for t in tickers:
         print(f"[DATA] Pobieram info dla {t}...")
         try:
@@ -71,7 +65,7 @@ def fetch_fundamentals(tickers):
             "ticker": t,
             "sector": info.get("sector", "Unknown"),
             # QUALITY
-            "roic_approx": safe_get(info, "returnOnEquity"),  # przybliżenie
+            "roic_approx": safe_get(info, "returnOnEquity"),
             "roe": safe_get(info, "returnOnEquity"),
             "gross_margin": safe_get(info, "grossMargins"),
             "oper_margin": safe_get(info, "operatingMargins"),
@@ -87,7 +81,7 @@ def fetch_fundamentals(tickers):
             "pfcf": safe_get(info, "priceToFreeCashFlows"),
             "ev_to_ebitda": safe_get(info, "enterpriseToEbitda"),
             "ev_to_revenue": safe_get(info, "enterpriseToRevenue"),
-            # RISK / BALANCE
+            # RISK
             "beta": safe_get(info, "beta"),
             "debt_to_equity": safe_get(info, "debtToEquity"),
             "current_ratio": safe_get(info, "currentRatio"),
@@ -95,19 +89,19 @@ def fetch_fundamentals(tickers):
             "total_debt": safe_get(info, "totalDebt"),
             "free_cashflow": safe_get(info, "freeCashflow"),
         }
-
         records.append(rec)
 
-    df = pd.DataFrame(records)
-    df.set_index("ticker", inplace=True)
+    df = pd.DataFrame(records).set_index("ticker")
     return df
 
 
+# =============================================================
+# PRICE VOLATILITY
+# =============================================================
+
 def fetch_price_volatility(tickers, window_days=252):
-    """
-    Liczy roczną zmienność cenową na podstawie log-zwrotów.
-    """
     print("[DATA] Pobieram dane cenowe dla zmienności...")
+
     data = yf.download(
         tickers,
         period="1y",
@@ -117,45 +111,36 @@ def fetch_price_volatility(tickers, window_days=252):
         progress=False,
     )
 
-    if isinstance(data, pd.DataFrame) and "Close" in data.columns:
-        close = data["Close"]
-    else:
-        close = data
-
+    close = data["Close"] if "Close" in data.columns else data
     vols = {}
+
     for t in tickers:
         if t not in close.columns:
             vols[t] = np.nan
             continue
-        series = close[t].dropna()
-        if len(series) < 30:
+        s = close[t].dropna()
+        if len(s) < 30:
             vols[t] = np.nan
             continue
-        rets = np.log(series).diff().dropna()
+        rets = np.log(s).diff().dropna()
         vols[t] = rets.std() * np.sqrt(252)
 
-    vol_df = pd.DataFrame({"price_vol": vols})
-    return vol_df
+    return pd.DataFrame({"price_vol": vols})
 
 
 # =============================================================
-# LICZENIE SCORE’ÓW: QUALITY / VALUE / GROWTH / RISK
+# SCORE CALCULATION
 # =============================================================
 
 def compute_scores(raw: pd.DataFrame) -> pd.DataFrame:
     df = raw.copy()
 
     # QUALITY
-    df["q_roic"] = percentile_rank(df["roic_approx"], higher_is_better=True)
-    df["q_gross"] = percentile_rank(df["gross_margin"], higher_is_better=True)
-    df["q_oper"] = percentile_rank(df["oper_margin"], higher_is_better=True)
-    df["q_profit"] = percentile_rank(df["profit_margin"], higher_is_better=True)
-
-    # EPS stability i FCF pozytywny na razie w przybliżeniu
-    df["fcf_positive"] = df["free_cashflow"].apply(
-        lambda x: 1.0 if (not pd.isna(x) and x > 0) else 0.0
-    )
-    df["q_fcf_flag"] = df["fcf_positive"] * 100.0
+    df["q_roic"] = percentile_rank(df["roic_approx"])
+    df["q_gross"] = percentile_rank(df["gross_margin"])
+    df["q_oper"] = percentile_rank(df["oper_margin"])
+    df["q_profit"] = percentile_rank(df["profit_margin"])
+    df["q_fcf_flag"] = df["free_cashflow"].apply(lambda x: 100 if (not pd.isna(x) and x > 0) else 0)
 
     df["QualityScore"] = (
         0.35 * df["q_roic"] +
@@ -179,27 +164,23 @@ def compute_scores(raw: pd.DataFrame) -> pd.DataFrame:
     )
 
     # GROWTH
-    df["g_rev"] = percentile_rank(df["revenue_growth"], higher_is_better=True)
-    df["g_earn"] = percentile_rank(df["earnings_growth"], higher_is_better=True)
+    df["g_rev"] = percentile_rank(df["revenue_growth"])
+    df["g_earn"] = percentile_rank(df["earnings_growth"])
 
-    df["GrowthScore"] = (
-        0.50 * df["g_rev"] +
-        0.50 * df["g_earn"]
-    )
+    df["GrowthScore"] = 0.5 * df["g_rev"] + 0.5 * df["g_earn"]
 
     # RISK
     df["r_de"] = percentile_rank(df["debt_to_equity"], higher_is_better=False)
     df["r_beta"] = percentile_rank(df["beta"], higher_is_better=False)
     df["r_vol"] = percentile_rank(df["price_vol"], higher_is_better=False)
 
-    # interest coverage nie mamy łatwo, więc na razie pomijamy
     df["RiskScore"] = (
         0.40 * df["r_de"] +
         0.30 * df["r_beta"] +
         0.30 * df["r_vol"]
     )
 
-    # TOTAL SCORE
+    # TOTAL
     df["TotalScore"] = (
         0.40 * df["QualityScore"] +
         0.25 * df["ValueScore"] +
@@ -211,153 +192,108 @@ def compute_scores(raw: pd.DataFrame) -> pd.DataFrame:
 
 
 # =============================================================
-# MARKET REGIME – SPY vs SMA200 (prosty filtr)
+# MARKET REGIME
 # =============================================================
 
 def get_market_regime():
-    """
-    Określa czy rynek jest w BULL czy BEAR na podstawie SPY vs SMA200.
-    """
-    import yfinance as yf
-
     spy = yf.download("SPY", start="1990-01-01", progress=False)
 
     if spy.empty:
-        print("[WARN] SPY data not loaded – assuming BULL regime")
         return "BULL"
 
     close = spy["Close"]
     sma200 = close.rolling(200).mean()
 
-    last_close = float(close.iloc[-1])
-    last_sma = float(sma200.iloc[-1])
-
-    if last_close >= last_sma:
+    if close.iloc[-1] >= sma200.iloc[-1]:
         return "BULL"
-    else:
-        return "BEAR"
+    return "BEAR"
+
 
 # =============================================================
-# GŁÓWNA FUNKCJA: SCREENER BUFFETT/LYNCH 2.0
+# MAIN SCREENER
 # =============================================================
 
 def run_screener(top_n=15):
     print("\n=== Buffett/Lynch 2.0 – Fundamental Screener ===\n")
-    today = datetime.now().strftime("%Y-%m-%d")
-    print(f"[INFO] Dzisiaj: {today}\n")
 
     regime = get_market_regime()
-    print(f"[REGIME] SPY regime: {regime}\n")
+    print(f"[REGIME] SPY: {regime}\n")
 
-    # 1. Dane fundamentalne
+    # FUNDAMENTY
     fundamentals = fetch_fundamentals(UNIVERSE_TICKERS)
 
-    # 2. Zmienność cenowa (risk)
+    # ZMIENNOŚĆ
     vol_df = fetch_price_volatility(UNIVERSE_TICKERS)
-    data = fundamentals.join(vol_df, how="left")
 
-    # 3. Wywalenie śmieci z kompletnie pustymi danymi
-    data = data.dropna(how="all")
-    if data.empty:
-        print("[ERROR] Brak danych po połączeniu – sprawdź tickery / yfinance.")
+    # MERGE
+    df = fundamentals.join(vol_df, how="left")
+    df.dropna(how="all", inplace=True)
+
+    if df.empty:
+        print("[ERROR] Brak danych!")
         return
 
-    # 4. Liczymy score’y
-    scored = compute_scores(data)
+    # SCORE
+    scored = compute_scores(df)
 
-    # 5. Filtry bezpieczeństwa
-    #    (ValueScore ≥ 40, cokolwiek z Quality > 0, price_vol nie NaN)
-    filtered = scored[
-        (scored["ValueScore"] >= 40) &
-        (~scored["price_vol"].isna())
-    ].copy()
+    # FILTRY
+    filtered = scored[(scored["ValueScore"] >= 40) & (~scored["price_vol"].isna())]
 
     if filtered.empty:
-        print("[WARN] Po filtrach nic nie zostało – strategia byłaby w T-Billach.\n")
+        print("[WARN] Po filtrach: 0 spółek → T-Bill.")
         return
 
-    # 6. Sortujemy po TotalScore malejąco
-    filtered.sort_values("TotalScore", ascending=False, inplace=True)
+    # SORT
+    filtered = filtered.sort_values("TotalScore", ascending=False)
 
-    # 7. Sektorowy sanity check: max 30% sektor
-    max_sector_weight = 0.30
-    max_by_sector = max(1, int(top_n * max_sector_weight))
+    # LIMITY SEKTOROWE
+    max_sector = max(1, int(top_n * 0.30))
+    final = []
+    sector_count = {}
 
-    final_rows = []
-    sector_counts = {}
-
-    for ticker, row in filtered.iterrows():
+    for t, row in filtered.iterrows():
         sec = row["sector"]
-        cnt = sector_counts.get(sec, 0)
-        if cnt >= max_by_sector:
-            continue
-        final_rows.append(row)
-        sector_counts[sec] = cnt + 1
-        if len(final_rows) >= top_n:
+        if sector_count.get(sec, 0) < max_sector:
+            final.append(row)
+            sector_count[sec] = sector_count.get(sec, 0) + 1
+        if len(final) == top_n:
             break
 
-    if not final_rows:
-        print("[WARN] Po limitach sektorowych nic nie weszło do TOP listy.\n")
-        return
+    final_df = pd.DataFrame(final)
 
-    final_df = pd.DataFrame(final_rows)
-    final_df = final_df.sort_values("TotalScore", ascending=False)
+    # ================================
+    #   WYŚWIETLENIE TOP LISTY
+    # ================================
 
-    # 8. Wynik
     print("\n=== TOP kandydaci do portfela (Buffett/Lynch 2.0) ===\n")
-    cols_show = [
-        "sector",
-        "TotalScore",
-        "QualityScore",
-        "ValueScore",
-        "GrowthScore",
-        "RiskScore",
-        "roic_approx",
-        "gross_margin",
-        "oper_margin",
-        "profit_margin",
-        "revenue_growth",
-        "earnings_growth",
-        "pfcf",
-        "pe",
-        "ev_to_ebitda",
-        "debt_to_equity",
-        "beta",
-        "price_vol",
-    ]
-    print(final_df[cols_show].round(3))
+    print(final_df[[
+        "sector", "TotalScore", "QualityScore",
+        "ValueScore", "GrowthScore", "RiskScore",
+        "roic_approx", "gross_margin", "oper_margin",
+        "profit_margin", "revenue_growth", "earnings_growth",
+        "pfcf", "pe", "ev_to_ebitda", "debt_to_equity",
+        "beta", "price_vol"
+    ]].round(3))
 
-    # 9. Zapis do CSV (opcjonalnie)
-    out_path = "reports/buffett_lynch_candidates.csv"
+    # zapis listy
     import os
     os.makedirs("reports", exist_ok=True)
-    final_df.to_csv(out_path)
-    print(f"\n[OK] Zapisano listę kandydatów do: {out_path}\n")
+    final_df.to_csv("reports/buffett_lynch_candidates.csv")
+    print("\n[OK] Zapisano kandydatów → reports/buffett_lynch_candidates.csv")
 
-    def run_screener(top_n: int = 15):
-    # ... (tu masz już swoją logikę liczenia QualityScore, ValueScore, itd.)
-    # Załóżmy, że na końcu masz DataFrame `scores_df`
-    # z kolumnami: ['sector', 'QualityScore', 'TotalScore', 'beta', 'price_vol', ...]
+    # ================================
+    #     PORTFEL Z WAGAMI
+    # ================================
 
-    # >>> TU BYŁO DOTYCHCZAS <<<
-    print("\n=== TOP kandydaci do portfela (Buffett/Lynch 2.0) ===")
-    print(scores_df.sort_values("TotalScore", ascending=False).head(top_n))
+    # final_df ma indeks = tickery → build_portfolio rozpozna ticker
+    portfolio = build_portfolio(final_df, top_n=top_n, quality_col="QualityScore")
 
-    # >>> DODAJEMY PORTFEL Z WAGAMI <<<
-    portfolio_df = build_portfolio(scores_df, top_n=top_n, quality_col="QualityScore")
+    print("\n=== PORTFEL (Buffett/Lynch 2.0) — wagi jakościowe ===\n")
+    print(portfolio[["ticker", "sector", "QualityScore", "TotalScore", "weight"]])
 
-    print("\n=== Proponowany portfel Buffett/Lynch 2.0 (z wagami) ===")
-    cols_to_show = ["ticker", "sector", "QualityScore", "TotalScore", "weight"]
-    cols_to_show = [c for c in cols_to_show if c in portfolio_df.columns]
+    portfolio.to_csv("reports/buffett_lynch_portfolio_today.csv", index=False)
+    print("\n[OK] Zapisano portfel → reports/buffett_lynch_portfolio_today.csv")
 
-    print(portfolio_df[cols_to_show])
-    print(f"\nSuma wag: {portfolio_df['weight'].sum():.4f}")
-
-    # (opcjonalnie) zapis do CSV
-    import os
-    os.makedirs("reports", exist_ok=True)
-    portfolio_df.to_csv("reports/buffett_lynch_portfolio_today.csv", index=False)
-    print("\n[INFO] Zapisano portfel do reports/buffett_lynch_portfolio_today.csv")
 
 if __name__ == "__main__":
     run_screener(top_n=15)
