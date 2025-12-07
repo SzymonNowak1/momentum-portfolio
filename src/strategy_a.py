@@ -5,12 +5,18 @@ def compute_regime(spy: pd.Series) -> pd.DataFrame:
     Strategy A: filtr makro dla SP500.
     Zwraca ramkę z kolumną "regime" = 'BULL' albo 'BEAR'.
     """
-    df = pd.DataFrame(spy)
-    df["SMA200"] = df[spy.name].rolling(200).mean()
-    df["ROC12"] = (df[spy.name] / df[spy.name].shift(252) - 1.0) * 100
+    # Tworzymy DataFrame ze stałą nazwą kolumny
+    df = pd.DataFrame({ "price": spy })
 
+    # SMA200
+    df["SMA200"] = df["price"].rolling(200).mean()
+
+    # ROC 12 miesięcy
+    df["ROC12"] = (df["price"] / df["price"].shift(252) - 1.0) * 100
+
+    # Reżim rynku
     df["regime"] = df.apply(
-        lambda row: "BULL" if row[spy.name] > row["SMA200"] and row["ROC12"] > 0 else "BEAR",
+        lambda row: "BULL" if row["price"] > row["SMA200"] and row["ROC12"] > 0 else "BEAR",
         axis=1
     )
 
