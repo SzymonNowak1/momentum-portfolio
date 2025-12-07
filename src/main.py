@@ -2,7 +2,7 @@ from datetime import datetime
 import traceback
 
 from data_loader import load_price_history
-from fx import load_fx_rates          # albo load_fx_row – zgodnie z tym,
+from fx import load_fx_row          # albo load_fx_row – zgodnie z tym,
                                       # jak nazywa się funkcja w fx.py
 from strategy_a import compute_regime
 from momentum import compute_top5_momentum
