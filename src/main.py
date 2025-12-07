@@ -4,7 +4,7 @@ from universe import get_us_universe
 from momentum import compute_momentum_scores
 from fx import load_fx_history
 from portfolio import build_target_allocation
-
+from db import init_db
 
 def main():
     print("=== Momentum Portfolio Engine V1 ===")
