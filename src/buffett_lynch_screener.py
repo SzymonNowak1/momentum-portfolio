@@ -3,24 +3,12 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from buffett_lynch_portfolio import build_portfolio
+from universe_dynamic import load_universe_for_date, BASE_UNIVERSE
+from datetime import datetime
 
-
-# =============================================================
-# UNIVERSE – możesz później podmienić na dynamiczne TOP100
-# =============================================================
-
-UNIVERSE_TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "META",
-    "NVDA", "BRK-B", "JPM", "JNJ", "XOM",
-    "PG", "HD", "V", "MA", "AVGO",
-    "LLY", "UNH", "PEP", "KO", "MRK",
-    "ABBV", "ADBE", "CSCO", "PFE", "TMO",
-    "MCD", "CRM", "NKE", "INTC", "DIS",
-    "WMT", "BAC", "COST", "LIN", "AMD",
-    "TXN", "ORCL", "QCOM", "IBM", "AMAT",
-    "HON", "NEE", "LOW", "PM", "UPS",
-    "SBUX", "RTX", "CVX", "CAT", "GE",
-]
+# Jeśli dynamiczne uniwersum jest zbudowane → wczytamy je z pliku,
+# jeśli nie → load_universe_for_date() zwróci BASE_UNIVERSE.
+UNIVERSE_TICKERS = load_universe_for_date(datetime.now())
 
 
 # =============================================================
