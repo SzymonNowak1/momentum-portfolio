@@ -1,0 +1,31 @@
+name: Build Dynamic Universe
+
+on:
+  workflow_dispatch:  # ręczne odpalenie
+
+jobs:
+  build-universe:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas numpy
+
+      - name: Build TOP100 universe
+        run: |
+          python src/universe_dynamic.py
+
+      - name: Upload universe CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-top100-universe
+          path: data/top100_universe_by_year.csv
