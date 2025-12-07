@@ -74,7 +74,23 @@ def record_transaction(**kwargs):
     conn.commit()
     conn.close()
 
+def record_contribution(timestamp, amount_pln):
+    """
+    Saves a monthly contribution (deposit) into the contributions table.
+    Example: record_contribution("2025-12-10", 2000)
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
 
+    cur.execute("""
+        INSERT INTO contributions (timestamp, amount_pln)
+        VALUES (?, ?)
+    """, (timestamp, amount_pln))
+
+    conn.commit()
+    conn.close()
+
+    print(f"[CONTRIBUTION] Saved contribution: {amount_pln} PLN on {timestamp}")
 # ---------------------------------------------------------
 # NEW: Compute total equity in PLN
 # ---------------------------------------------------------
