@@ -8,7 +8,13 @@ from datetime import datetime
 
 # Jeśli dynamiczne uniwersum jest zbudowane → wczytamy je z pliku,
 # jeśli nie → load_universe_for_date() zwróci BASE_UNIVERSE.
-UNIVERSE_TICKERS = load_universe_for_date(datetime.now())
+from datasets.sp500_source import load_sp500_constituents
+
+def get_universe_for_year(year: int):
+    df = load_sp500_constituents(year)
+    df_sorted = df.sort_values("weight", ascending=False)
+    tickers = df_sorted["ticker"].head(100).tolist()
+    return tickers
 
 
 # =============================================================
