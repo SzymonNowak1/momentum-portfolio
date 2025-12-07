@@ -51,6 +51,10 @@ def main():
     today = today_dt.strftime("%Y-%m-%d")
     print(f"[INFO] Today: {today}\n")
 
+    # inicjalizacja bazy (tabele, jeśli brak)
+    init_db()
+    print("[DB] SQLite portfolio database initialized.\n")
+
     # ========================================================
     # 1. STRATEGIA A — MARKET REGIME (SP500)
     # ========================================================
@@ -97,7 +101,7 @@ def main():
     print("[PORTFOLIO] Obecne pozycje:")
     print(positions if not positions.empty else "(brak pozycji)", "\n")
 
-    equity = estimate_total_equity(positions, fx_row)
+    equity = estimate_total_equity(price_data, fx_row)
     print(f"[PORTFOLIO] Łączne equity portfela: {equity:,.2f} PLN\n")
 
     # ========================================================
