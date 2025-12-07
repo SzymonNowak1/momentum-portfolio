@@ -216,13 +216,16 @@ def compute_scores(raw: pd.DataFrame) -> pd.DataFrame:
 
 def get_market_regime():
     spy = yf.download("SPY", period="300d", interval="1d", auto_adjust=True, progress=False)
-    close = spy["Close"]
+    close = df["Close"]
     sma200 = close.rolling(200).mean()
-    if close.iloc[-1] >= sma200.iloc[-1]:
+
+    last_close = float(close.iloc[-1])
+    last_sma = float(sma200.iloc[-1])
+
+    if last_close >= last_sma:
         return "BULL"
     else:
         return "BEAR"
-
 
 # =============================================================
 # GŁÓWNA FUNKCJA: SCREENER BUFFETT/LYNCH 2.0
