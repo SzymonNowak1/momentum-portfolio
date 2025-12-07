@@ -6,7 +6,7 @@ import pandas as pd
 from db import get_connection
 
 
-def load_positions() -> pd.DataFrame:
+def load_portfolio_positions() -> pd.DataFrame:
     """
     Wczytuje aktualne pozycje z bazy.
     Zwraca DataFrame z kolumnami:
@@ -16,7 +16,7 @@ def load_positions() -> pd.DataFrame:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute(
-        "SELECT ticker, currency, units, avg_price_ccy, last_update FROM positions"
+        "SELECT ticker, currency, units, avg_price_ccy, last_update FROM portfolio_positions"
     )
     rows = cur.fetchall()
     conn.close()
@@ -29,10 +29,10 @@ def load_positions() -> pd.DataFrame:
     return df
 
 
-def save_positions(df: pd.DataFrame) -> None:
+def save_portfolio_positions(df: pd.DataFrame) -> None:
     """
     Zapisuje cały DataFrame pozycji do bazy.
-    Obecny stan tabeli 'positions' jest nadpisywany.
+    Obecny stan tabeli 'portfolio_positions' jest nadpisywany.
     """
     required_cols = {"ticker", "currency", "units", "avg_price_ccy", "last_update"}
     if not required_cols.issubset(df.columns):
@@ -40,12 +40,12 @@ def save_positions(df: pd.DataFrame) -> None:
 
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM positions")
+    cur.execute("DELETE FROM portfolio_positions")
 
     for _, row in df.iterrows():
         cur.execute(
             """
-            INSERT INTO positions (ticker, currency, units, avg_price_ccy, last_update)
+            INSERT INTO portfolio_positions (ticker, currency, units, avg_price_ccy, last_update)
             VALUES (?, ?, ?, ?, ?)
             """,
             (
@@ -79,7 +79,7 @@ def upsert_single_position(
     cur = conn.cursor()
 
     cur.execute(
-        "SELECT units, avg_price_ccy FROM positions WHERE ticker=?",
+        "SELECT units, avg_price_ccy FROM portfolio_positions WHERE ticker=?",
         (ticker,),
     )
     row = cur.fetchone()
@@ -90,7 +90,7 @@ def upsert_single_position(
         # nowa pozycja – zakładamy BUY
         cur.execute(
             """
-            INSERT INTO positions (ticker, currency, units, avg_price_ccy, last_update)
+            INSERT INTO portfolio_positions (ticker, currency, units, avg_price_ccy, last_update)
             VALUES (?, ?, ?, ?, ?)
             """,
             (ticker, currency, delta_units, trade_price_ccy, now_str),
@@ -100,7 +100,7 @@ def upsert_single_position(
         new_units = old_units + delta_units
 
         if new_units <= 0:
-            cur.execute("DELETE FROM positions WHERE ticker=?", (ticker,))
+            cur.execute("DELETE FROM portfolio_positions WHERE ticker=?", (ticker,))
         else:
             if delta_units > 0:
                 new_avg = (old_units * old_avg + delta_units * trade_price_ccy) / new_units
@@ -109,7 +109,7 @@ def upsert_single_position(
 
             cur.execute(
                 """
-                UPDATE positions
+                UPDATE portfolio_positions
                 SET units=?, avg_price_ccy=?, last_update=?
                 WHERE ticker=?
                 """,
