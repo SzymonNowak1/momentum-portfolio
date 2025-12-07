@@ -152,6 +152,28 @@ def main():
 
     print(f"\n[Portfolio] Target allocation for equity = {equity_pln:,.0f} PLN:")
     print(alloc_df.to_string(index=False))
+     # --- 9. Miesięczny rebalans (BUY/SELL) tylko w dzień dopłaty ---
+    if is_contrib:
+        print("\n[REBALANCE] Running monthly rebalance (SELL ALL -> BUY allocation)...")
+
+        # 1) najpierw SELL ALL
+        sell_all_positions_for_rebalance(
+            today=today,
+            fx_row=fx_today_row,
+            regime=regime_today,
+            note="MONTHLY REBALANCE",
+        )
+
+        # 2) potem BUY wg docelowej alokacji
+        buy_according_to_allocation(
+            today=today,
+            alloc_df=alloc_df,
+            fx_row=fx_today_row,
+            regime=regime_today,
+            note="MONTHLY REBALANCE",
+        )
+    else:
+        print("\n[REBALANCE] Today is not a rebalance day.")
 
 
 if __name__ == "__main__":
