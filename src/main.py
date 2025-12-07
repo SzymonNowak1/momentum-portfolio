@@ -6,6 +6,7 @@ from fx import load_fx_row
 from strategy_a import compute_regime
 from momentum import compute_top5_momentum
 from universe import load_universe
+from db import init_db
 
 from portfolio_storage import (
     load_positions,
