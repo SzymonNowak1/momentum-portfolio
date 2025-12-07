@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime
-
+from buffett_lynch_portfolio import build_portfolio
 # =============================================================
 # UNIVERSE – na start możesz wrzucić tu S&P100 / swoje tickery
 # =============================================================
@@ -334,6 +334,30 @@ def run_screener(top_n=15):
     final_df.to_csv(out_path)
     print(f"\n[OK] Zapisano listę kandydatów do: {out_path}\n")
 
+    def run_screener(top_n: int = 15):
+    # ... (tu masz już swoją logikę liczenia QualityScore, ValueScore, itd.)
+    # Załóżmy, że na końcu masz DataFrame `scores_df`
+    # z kolumnami: ['sector', 'QualityScore', 'TotalScore', 'beta', 'price_vol', ...]
+
+    # >>> TU BYŁO DOTYCHCZAS <<<
+    print("\n=== TOP kandydaci do portfela (Buffett/Lynch 2.0) ===")
+    print(scores_df.sort_values("TotalScore", ascending=False).head(top_n))
+
+    # >>> DODAJEMY PORTFEL Z WAGAMI <<<
+    portfolio_df = build_portfolio(scores_df, top_n=top_n, quality_col="QualityScore")
+
+    print("\n=== Proponowany portfel Buffett/Lynch 2.0 (z wagami) ===")
+    cols_to_show = ["ticker", "sector", "QualityScore", "TotalScore", "weight"]
+    cols_to_show = [c for c in cols_to_show if c in portfolio_df.columns]
+
+    print(portfolio_df[cols_to_show])
+    print(f"\nSuma wag: {portfolio_df['weight'].sum():.4f}")
+
+    # (opcjonalnie) zapis do CSV
+    import os
+    os.makedirs("reports", exist_ok=True)
+    portfolio_df.to_csv("reports/buffett_lynch_portfolio_today.csv", index=False)
+    print("\n[INFO] Zapisano portfel do reports/buffett_lynch_portfolio_today.csv")
 
 if __name__ == "__main__":
     run_screener(top_n=15)
