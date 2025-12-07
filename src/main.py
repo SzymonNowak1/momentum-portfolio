@@ -4,8 +4,13 @@ from momentum import compute_momentum_scores
 from universe import get_us_universe
 from fx import load_fx_history
 from portfolio import build_target_allocation
+from db import init_db
 
 def main():
+    # --- 0. Inicjalizacja bazy portfela ---
+    init_db()
+    print("[DB] SQLite portfolio database initialized.")
+    
     print("=== Momentum Portfolio Engine ===")
 
     # --- 1. Strategia A: SP500 Regime (SPY) ---
