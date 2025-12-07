@@ -22,8 +22,6 @@ from portfolio import (
 
 from trade_engine import buy_according_to_allocation
 
-)
-
 from contribution import check_contribution_day
 
 
