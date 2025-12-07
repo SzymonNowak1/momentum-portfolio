@@ -3,7 +3,7 @@ name: Weekly Rebalance Test
 on:
   schedule:
     - cron: '0 7 * * 1'   # poniedziałek 07:00 UTC
-  workflow_dispatch:       # ręczne odpalenie z poziomu GitHub UI
+  workflow_dispatch:       # możliwość ręcznego odpalenia z UI
 
 jobs:
   run-script:
@@ -20,12 +20,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run main.py
-        run: python src/main.py > reports/last_report.txt
-
-      - name: Commit report
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add reports/last_report.txt
-          git commit -m "Update report" || echo "No changes"
-          git push
+        run: python src/main.py
