@@ -1,27 +1,42 @@
-from __future__ import annotations
+from datetime import datetime, timedelta
+import pandas as pd
 
-from datetime import date, timedelta
-import pandas_market_calendars as mcal
-
-
-nyse = mcal.get_calendar("NYSE")
+# CONTRIBUTION AMOUNT FOR BACKTEST (later manual)
+MONTHLY_CONTRIBUTION_PLN = 2000
 
 
-def next_trading_day(dt: date) -> date:
-    """Zwraca dt jeśli to dzień handlowy, inaczej najbliższy kolejny."""
-    while True:
-        schedule = nyse.schedule(start_date=dt, end_date=dt)
-        if not schedule.empty:
-            return dt
-        dt += timedelta(days=1)
+def is_weekend(date):
+    return date.weekday() >= 5  # 5 = Saturday, 6 = Sunday
 
 
-def is_contribution_day(today: date) -> bool:
+def next_business_day(date):
+    """Return the next weekday (Mon–Fri)."""
+    while is_weekend(date):
+        date += timedelta(days=1)
+    return date
+
+
+def check_contribution_day(today: datetime):
     """
-    Dopłata przypada na:
-    - 10. dzień miesiąca
-    - jeśli to dzień wolny → przesunięcie
+    Returns how much PLN to contribute today.
+    Logic:
+    - Contribution day = 10th of month
+    - If 10th is weekend → next business day
+    - If today is that business day → contribute 2000 PLN
     """
-    target = date(today.year, today.month, 10)
-    target = next_trading_day(target)
-    return today == target
+
+    # Expected contribution day this month
+    target = today.replace(day=10)
+
+    # If target day already passed this month, no contribution
+    if today.date() < target.date():
+        return 0
+
+    # Move 10th to next business day if needed
+    target = next_business_day(target)
+
+    # Only contribute if TODAY == calculated contribution day
+    if today.date() == target.date():
+        return MONTHLY_CONTRIBUTION_PLN
+
+    return 0
