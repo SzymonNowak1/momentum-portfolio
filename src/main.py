@@ -71,29 +71,22 @@ def main():
     # ========================================================
     print("\n[B] Obliczam ranking momentum dla US...")
 
-    # 1. Ładuję listę tickerów do wszechświata
+    # 1. Ładuję dane dla wszystkich tickerów w universe
     universe = load_universe()
+    price_data = load_price_history(universe, today)
 
-    # 2. Pobieram historię cen dla każdego tickera osobno
-    price_data_top5 = {}
-    for t in universe:
-        try:
-            df = load_price_history(t, period="2y")
-            price_data_top5[t] = df
-        except Exception as e:
-            print(f"[WARN] [TOP5] Brak danych dla {t}: {e}")
+    # 2. Momentum ranking
+    top5 = compute_top5_momentum(price_data)
 
-    # 3. Liczę TOP5 momentum
-    top5 = compute_top5_momentum(price_data_top5)
-    print("[B] TOP5 momentum:", top5, "\n")
-
+    print("[B] TOP5 momentum:", top5)
+    
     # ========================================================
     # 3. FX RATES
     # ========================================================
     fx_row = load_fx_row()
     print("[FX] Dzisiejsze kursy:")
     print(fx_row, "\n")
-
+    
     # ========================================================
     # 4. LOAD PORTFOLIO STATE
     # ========================================================
@@ -101,9 +94,11 @@ def main():
     print("[PORTFOLIO] Obecne pozycje:")
     print(positions if not positions.empty else "(brak pozycji)", "\n")
 
+    # Uwaga: teraz price_data istnieje i equity się policzy!
     equity = estimate_total_equity(price_data, fx_row)
     print(f"[PORTFOLIO] Łączne equity portfela: {equity:,.2f} PLN\n")
-
+    
+    
     # ========================================================
     # 5. SELL SIGNALS (natychmiastowe)
     # ========================================================
