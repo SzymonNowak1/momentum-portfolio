@@ -1,22 +1,31 @@
-import pandas as pd
 from datetime import datetime
 import traceback
 
-# === SYSTEM MODULES ===
 from data_loader import load_price_history
+from fx import load_fx_rates          # albo load_fx_row – zgodnie z tym,
+                                      # jak nazywa się funkcja w fx.py
 from strategy_a import compute_regime
-from strategy_b import compute_top5_momentum
-from fx import load_fx_row
+from momentum import compute_top5_momentum
+from universe import load_universe
+
 from portfolio_storage import (
     load_positions,
     estimate_total_equity,
-    record_contribution
+    record_contribution,
 )
+
 from portfolio import (
     process_sell_signals,
     execute_sell_orders,
-    build_target_allocation
+    build_target_allocation,          # <-- TYLKO z portfolio
 )
+
+from trade_engine import (
+    sell_all_positions_for_rebalance,
+    buy_according_to_allocation,
+)
+
+from contribution import check_contribution_day
 
 
 # ============================================================
