@@ -215,8 +215,18 @@ def compute_scores(raw: pd.DataFrame) -> pd.DataFrame:
 # =============================================================
 
 def get_market_regime():
-    spy = yf.download("SPY", period="300d", interval="1d", auto_adjust=True, progress=False)
-    close = df["Close"]
+    """
+    Określa czy rynek jest w BULL czy BEAR na podstawie SPY vs SMA200.
+    """
+    import yfinance as yf
+
+    spy = yf.download("SPY", start="1990-01-01", progress=False)
+
+    if spy.empty:
+        print("[WARN] SPY data not loaded – assuming BULL regime")
+        return "BULL"
+
+    close = spy["Close"]
     sma200 = close.rolling(200).mean()
 
     last_close = float(close.iloc[-1])
