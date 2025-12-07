@@ -2,8 +2,7 @@ from datetime import datetime
 import traceback
 
 from data_loader import load_price_history
-from fx import load_fx_row          # albo load_fx_row – zgodnie z tym,
-                                      # jak nazywa się funkcja w fx.py
+from fx import load_fx_row
 from strategy_a import compute_regime
 from momentum import compute_top5_momentum
 from universe import load_universe
@@ -17,7 +16,7 @@ from portfolio_storage import (
 from portfolio import (
     process_sell_signals,
     execute_sell_orders,
-    build_target_allocation,          # <-- TYLKO z portfolio
+    build_target_allocation,
 )
 
 from trade_engine import (
@@ -29,14 +28,14 @@ from contribution import check_contribution_day
 
 
 # ============================================================
-# Helper – check if today is contribution + rebalance day
-# 10th day of month, or next weekday if weekend / holiday
+# Helper – czy dziś dzień rebalancingu?
+# 10-ty dzień miesiąca, jeśli to dzień roboczy
 # ============================================================
-def is_rebalance_day(today: datetime):
+def is_rebalance_day(today: datetime) -> bool:
     if today.day != 10:
         return False
-    # weekend fallback
-    if today.weekday() >= 5:  # 5 = sobota, 6 = niedziela
+    # weekend (5 = sobota, 6 = niedziela)
+    if today.weekday() >= 5:
         return False
     return True
 
@@ -47,8 +46,8 @@ def is_rebalance_day(today: datetime):
 def main():
     print("\n=== Momentum Portfolio Engine v2 (synchronizacja DB) ===\n")
 
-    today = datetime.now().strftime("%Y-%m-%d")
     today_dt = datetime.now()
+    today = today_dt.strftime("%Y-%m-%d")
     print(f"[INFO] Today: {today}\n")
 
     # ========================================================
@@ -58,7 +57,8 @@ def main():
     spy_df = load_price_history("SPY", period="15y")
 
     print("[A] Obliczam tryb rynku SP500...")
-    regime = compute_regime(spy_df["SPY"])
+    # kluczowa zmiana: używamy kolumny 'Close', a nie nieistniejącej 'SPY'
+    regime = compute_regime(spy_df["Close"])
     print(f"[A] Dzisiejszy tryb rynku = {regime}\n")
 
     # ========================================================
@@ -66,14 +66,21 @@ def main():
     # ========================================================
     print("\n[B] Obliczam ranking momentum dla US...")
 
-    # 1. Ładuję dane dla wszystkich tickerów
+    # 1. Ładuję listę tickerów do wszechświata
     universe = load_universe()
-    price_data = load_price_history(universe, today)
 
-    # 2. Liczę TOP5 momentum
-    top5 = compute_top5_momentum(price_data)
+    # 2. Pobieram historię cen dla każdego tickera osobno
+    price_data_top5 = {}
+    for t in universe:
+        try:
+            df = load_price_history(t, period="2y")
+            price_data_top5[t] = df
+        except Exception as e:
+            print(f"[WARN] [TOP5] Brak danych dla {t}: {e}")
 
-    print("[B] TOP5 momentum:", top5)
+    # 3. Liczę TOP5 momentum
+    top5 = compute_top5_momentum(price_data_top5)
+    print("[B] TOP5 momentum:", top5, "\n")
 
     # ========================================================
     # 3. FX RATES
@@ -98,14 +105,14 @@ def main():
     print("[SELL] Sprawdzam sygnały sprzedaży...\n")
 
     price_data = {}
-    tickers_to_check = set(top5) | set(positions["ticker"].tolist())
+    tickers_to_check = set(top5) | set(positions["ticker"].tolist()) if not positions.empty else set(top5)
 
     for t in tickers_to_check:
         try:
             df = load_price_history(t, period="2y")
             price_data[t] = df
-        except:
-            print(f"[WARN] Brak danych dla {t}")
+        except Exception as e:
+            print(f"[WARN] [SELL] Brak danych dla {t}: {e}")
 
     sell_list = process_sell_signals(
         today=today,
@@ -120,7 +127,7 @@ def main():
         sell_list=sell_list,
         price_data=price_data,
         fx_row=fx_row,
-        regime=regime
+        regime=regime,
     )
 
     # reload portfolio after sells
@@ -139,22 +146,20 @@ def main():
 
         positions = load_positions()
         equity = estimate_total_equity(positions, fx_row)
-
         print(f"[BUY] Equity po wpłacie = {equity:,.2f} PLN")
 
         # Budujemy target allocation
         alloc_df = build_target_allocation(
-            top5,
-            weights=None,     # equal weight
+            tickers=top5,
+            weights=None,   # equal weight
             equity_pln=equity,
-            fx_row=fx_row
+            fx_row=fx_row,
         )
 
         print("\n[BUY] Target allocation:")
         print(alloc_df)
 
         print("\n[BUY] ✨ Tu w kolejnych krokach dodamy wykonywanie BUY transaction ✨\n")
-
     else:
         print("[BUY] Dziś NIE jest dzień rebalancingu.\n")
 
@@ -167,7 +172,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:
+    except Exception:
         print("\n[ERROR] Wystąpił błąd w engine:")
         print(traceback.format_exc())
         exit(1)
