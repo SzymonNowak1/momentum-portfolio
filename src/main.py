@@ -20,9 +20,8 @@ from portfolio import (
     build_target_allocation,
 )
 
-from trade_engine import (
-    sell_all_positions_for_rebalance,
-    buy_according_to_allocation,
+from trade_engine import buy_according_to_allocation
+
 )
 
 from contribution import check_contribution_day
