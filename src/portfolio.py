@@ -211,3 +211,48 @@ def build_target_allocation(today, top5, total_equity_pln, fx_row):
         })
 
     return pd.DataFrame(rows)
+
+def build_target_allocation(equity_pln, top5, fx_row):
+    """
+    Create equal-weight target allocation for current TOP5 momentum tickers.
+
+    Parameters:
+        equity_pln  - total portfolio equity (in PLN)
+        top5        - list of tickers
+        fx_row      - FX rates row: USD, EUR, PLN
+
+    Returns:
+        DataFrame: ticker | currency | weight | target_value_pln | target_value_ccy
+    """
+
+    if len(top5) == 0:
+        return pd.DataFrame()
+
+    weight = 1 / len(top5)
+
+    records = []
+    for ticker in top5:
+
+        # Assign currency
+        currency = "USD"  # for now all US stocks
+
+        # FX conversion
+        if currency == "USD":
+            fx = fx_row["USD"]
+        elif currency == "EUR":
+            fx = fx_row["EUR"]
+        else:
+            fx = 1.0
+
+        target_value_pln = equity_pln * weight
+        target_value_ccy = target_value_pln / fx
+
+        records.append({
+            "ticker": ticker,
+            "currency": currency,
+            "weight": weight,
+            "target_value_pln": target_value_pln,
+            "target_value_ccy": target_value_ccy
+        })
+
+    return pd.DataFrame(records)
