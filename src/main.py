@@ -65,7 +65,7 @@ def main():
     # 2. STRATEGIA B — MOMENTUM TOP 5
     # ========================================================
     print("[B] Obliczam ranking momentum dla US...")
-    top5 = compute_top5_momentum()
+    top5 = compute_top5_momentum(price_data)
     print(f"[B] TOP 5 momentum = {top5}\n")
 
     # ========================================================
