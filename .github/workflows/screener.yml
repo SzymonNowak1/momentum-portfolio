@@ -1,0 +1,31 @@
+name: Buffett-Lynch Screener
+
+on:
+  workflow_dispatch:  # pozwala odpalać ręcznie
+
+jobs:
+  run-screener:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas numpy
+
+      - name: Run Buffett-Lynch screener
+        run: |
+          python src/buffett_lynch_screener.py
+
+      - name: Upload screener report
+        uses: actions/upload-artifact@v3
+        with:
+          name: buffett-lynch-report
+          path: reports/buffett_lynch_candidates.csv
