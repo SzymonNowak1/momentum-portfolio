@@ -1,105 +1,55 @@
-import sqlite3
 import pandas as pd
-from pathlib import Path
-
-DB_PATH = Path("data/portfolio.db")
+from db import get_connection
 
 
 # ---------------------------------------------------------
 # Load current positions
 # ---------------------------------------------------------
 def load_positions():
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql("SELECT * FROM portfolio_positions", conn)
-    conn.close()
+    conn = get_connection()
+    try:
+        df = pd.read_sql("SELECT * FROM portfolio_positions", conn)
+    except Exception:
+        # jeśli tabela nie istnieje / jest pusta -> zwracamy pusty DF
+        df = pd.DataFrame(columns=["ticker", "quantity", "currency", "avg_price_ccy", "avg_price_pln"])
+    finally:
+        conn.close()
     return df
 
 
 # ---------------------------------------------------------
-# Save (overwrite) a position
+# Save monthly contribution
 # ---------------------------------------------------------
-def update_position(ticker, quantity, currency, avg_price):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO portfolio_positions (ticker, quantity, currency, avg_price)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(ticker)
-        DO UPDATE SET
-            quantity = excluded.quantity,
-            currency = excluded.currency,
-            avg_price = excluded.avg_price
-    """, (ticker, quantity, currency, avg_price))
-
-    conn.commit()
-    conn.close()
-
-
-# ---------------------------------------------------------
-# Remove a position
-# ---------------------------------------------------------
-def remove_position(ticker):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-
-    cur.execute("DELETE FROM portfolio_positions WHERE ticker=?", (ticker,))
-    conn.commit()
-    conn.close()
-
-
-# ---------------------------------------------------------
-# Save transaction (BUY or SELL)
-# ---------------------------------------------------------
-def record_transaction(**kwargs):
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO transactions (timestamp, ticker, side, quantity,
-                                  price_ccy, currency, price_pln, regime, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        kwargs["timestamp"],
-        kwargs["ticker"],
-        kwargs["side"],
-        kwargs["quantity"],
-        kwargs["price_ccy"],
-        kwargs["currency"],
-        kwargs["price_pln"],
-        kwargs["regime"],
-        kwargs.get("note", "")
-    ))
-
-    conn.commit()
-    conn.close()
-
 def record_contribution(timestamp, amount_pln):
     """
-    Saves a monthly contribution (deposit) into the contributions table.
-    Example: record_contribution("2025-12-10", 2000)
+    Zapisuje miesięczną wpłatę do tabeli contributions.
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("""
+    cur.execute(
+        """
         INSERT INTO contributions (timestamp, amount_pln)
         VALUES (?, ?)
-    """, (timestamp, amount_pln))
+        """,
+        (timestamp, amount_pln),
+    )
 
     conn.commit()
     conn.close()
 
     print(f"[CONTRIBUTION] Saved contribution: {amount_pln} PLN on {timestamp}")
+
+
 # ---------------------------------------------------------
-# NEW: Compute total equity in PLN
+# Compute total equity in PLN
 # ---------------------------------------------------------
 def estimate_total_equity(price_data, fx_row):
     """
-    Returns total value of the portfolio in PLN.
+    Zwraca całkowitą wartość portfela w PLN.
 
-    price_data  : dict[ticker] = DataFrame with Close column
-    fx_row      : Series with fx rates: fx_row["USD"], fx_row["EUR"]
+    price_data  : dict[ticker] -> DataFrame z kolumną 'Close'
+    fx_row      : Series z kursami FX: fx_row['USD'], fx_row['EUR']
     """
 
     positions = load_positions()
