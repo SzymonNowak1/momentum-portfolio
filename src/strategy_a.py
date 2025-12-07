@@ -4,9 +4,10 @@ def compute_regime(spy: pd.Series) -> pd.DataFrame:
     """
     Strategy A: filtr makro dla SP500.
     Zwraca ramkę z kolumną "regime" = 'BULL' albo 'BEAR'.
+    spy – to powinna być Series z cenami SPY.
     """
-    # Tworzymy DataFrame ze stałą nazwą kolumny
-    df = pd.DataFrame({ "price": spy })
+    # Z Series robimy DataFrame z kolumną "price"
+    df = spy.to_frame(name="price")
 
     # SMA200
     df["SMA200"] = df["price"].rolling(200).mean()
