@@ -1,37 +1,56 @@
 import pandas as pd
+import numpy as np
 
 
-def compute_momentum_scores(prices: pd.DataFrame) -> pd.DataFrame:
+def compute_momentum(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Liczy ROC 3M / 6M / 12M i wynikowy score dla każdej kolumny (tickera).
-    prices: DataFrame, index = daty, kolumny = tickery.
-    Zwraca DataFrame z ostatniego dnia z kolumnami:
-      ['ticker', 'roc3', 'roc6', 'roc12', 'score']
-    posortowany malejąco po score.
+    Dodaje kolumny:
+        ROC3, ROC6, ROC12, score
     """
+    df = df.copy()
 
-    # ~21 sesji w miesiącu
-    roc3 = prices.pct_change(63)    # 3 miesiące
-    roc6 = prices.pct_change(126)   # 6 miesięcy
-    roc12 = prices.pct_change(252)  # 12 miesięcy
+    df["ROC3"] = df["Close"].pct_change(63) * 100     # 3 months
+    df["ROC6"] = df["Close"].pct_change(126) * 100    # 6 months
+    df["ROC12"] = df["Close"].pct_change(252) * 100   # 12 months
 
-    last_date = prices.index[-1]
-
-    roc3_last = roc3.loc[last_date]
-    roc6_last = roc6.loc[last_date]
-    roc12_last = roc12.loc[last_date]
-
-    df = pd.DataFrame({
-        "ticker": prices.columns,
-        "roc3": roc3_last.values * 100.0,
-        "roc6": roc6_last.values * 100.0,
-        "roc12": roc12_last.values * 100.0,
-    })
-
-    # prosty momentum score (wagi można później stroić)
-    df["score"] = 0.3 * df["roc3"] + 0.3 * df["roc6"] + 0.4 * df["roc12"]
-
-    df = df.dropna()
-    df = df.sort_values("score", ascending=False).reset_index(drop=True)
+    df["score"] = df["ROC3"] * 0.2 + df["ROC6"] * 0.3 + df["ROC12"] * 0.5
 
     return df
+
+
+def compute_top5_momentum(price_data: dict) -> list:
+    """
+    Przyjmuje:
+       price_data: dict[ticker] = DataFrame z kolumną 'Close'
+
+    Zwraca:
+        list TOP5 tickerów na podstawie score
+    """
+
+    results = []
+
+    for ticker, df in price_data.items():
+        mom = compute_momentum(df)
+        score = mom["score"].iloc[-1]
+        roc3 = mom["ROC3"].iloc[-1]
+        roc6 = mom["ROC6"].iloc[-1]
+        roc12 = mom["ROC12"].iloc[-1]
+
+        results.append({
+            "ticker": ticker,
+            "score": score,
+            "roc3": roc3,
+            "roc6": roc6,
+            "roc12": roc12
+        })
+
+    mom_df = pd.DataFrame(results)
+    mom_df = mom_df.sort_values("score", ascending=False).reset_index(drop=True)
+
+    # Debug wypis TOP5
+    print("\n[Strategy B] TOP 5 momentum today:")
+    for i, row in mom_df.head(5).iterrows():
+        print(f"{i+1}. {row['ticker']}: score={row['score']:.2f}, "
+              f"roc3={row['roc3']:.1f}%, roc6={row['roc6']:.1f}%, roc12={row['roc12']:.1f}%")
+
+    return mom_df["ticker"].head(5).tolist()
