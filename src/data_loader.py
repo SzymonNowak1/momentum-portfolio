@@ -3,15 +3,22 @@ import pandas as pd
 
 def load_price_history(ticker: str, period: str = "10y") -> pd.DataFrame:
     """
-    Pobiera dane dla pojedynczego tickera (np. SPY, AAPL, MSFT)
-    z yfinance, z auto-adjust (total return).
-    Zwraca DataFrame z jedną kolumną o nazwie tickera.
+    Pobiera dane cenowe dla 1 ticker'a i zwraca DataFrame z jedną kolumną (Close),
+    nazwaną tickerem.
     """
-    data = yf.download(ticker, period=period, auto_adjust=True)
 
-    close = data["Close"].copy()
-    close.name = ticker           # <-- NAZYWAMY SERIĘ RĘCZNIE
-    return close.to_frame()
+    raw = yf.download(ticker, period=period, auto_adjust=True)
+
+    # wybieramy tylko Close, upewniamy się że to Series
+    close = raw["Close"].copy()
+
+    # nadajemy nazwę kolumnie
+    close.name = ticker
+
+    # zamieniamy na DataFrame
+    df = pd.DataFrame(close)
+
+    return df
 
 def load_price_history_multi(tickers, period: str = "10y") -> pd.DataFrame:
     """
