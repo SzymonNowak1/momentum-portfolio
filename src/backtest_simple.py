@@ -6,7 +6,7 @@ from universe import load_universe
 import os
 
 # =====================================================================
-# BACKTEST PARAMETERS
+# SETTINGS
 # =====================================================================
 START = "2015-01-01"
 END = "2025-12-05"
@@ -16,36 +16,36 @@ MONTHLY_CONTRIBUTION = 2000  # PLN
 
 os.makedirs("reports", exist_ok=True)
 
+
 # =====================================================================
-# LOAD PRICE DATA
+# DATA
 # =====================================================================
 def download_price_history(tickers):
-    data = yf.download(
+    df = yf.download(
         tickers,
         start=START,
         end=END,
-        interval="1d",
         auto_adjust=True,
+        interval="1d",
         progress=False,
         threads=True
     )
-    return data["Close"]
+    return df["Close"]
 
 
 # =====================================================================
-# MOMENTUM CALCULATION
+# MOMENTUM SCORE
 # =====================================================================
 def compute_momentum_scores(price_df):
     roc3 = price_df.pct_change(63).iloc[-1]
     roc6 = price_df.pct_change(126).iloc[-1]
     roc12 = price_df.pct_change(252).iloc[-1]
-
     score = (roc3 + roc6 + roc12) / 3
     return score.sort_values(ascending=False)
 
 
 # =====================================================================
-# BACKTEST ENGINE
+# BACKTEST ENGINE (STABLE)
 # =====================================================================
 def run_backtest():
 
@@ -54,76 +54,89 @@ def run_backtest():
     tickers = load_universe()
     prices = download_price_history(tickers)
 
-    equity = 0.0
+    # EQUITY MODEL
+    cash = MONTHLY_CONTRIBUTION   # piewsza wpłata
     positions = {}
     trades = []
     equity_curve = []
 
-    current_month = None
-
     for date, row in prices.iterrows():
+
         if row.isna().all():
             continue
 
-        # --- monthly contribution ---
+        # --------------------------
+        # MONTHLY CONTRIBUTION
+        # --------------------------
         if date.day == REBALANCE_DAY:
-            equity += MONTHLY_CONTRIBUTION
+            cash += MONTHLY_CONTRIBUTION
 
-        # --- rebalancing only on REBALANCE_DAY ---
-        if date.day == REBALANCE_DAY:
+            # Compute momentum
             scores = compute_momentum_scores(prices.loc[:date])
-            topN = list(scores.head(TOP_N).index)
+            selected = list(scores.head(TOP_N).index)
 
-            # SELL everything outside topN
-            for ticker in list(positions.keys()):
-                if ticker not in topN:
-                    buy_price = positions[ticker]["buy_price"]
-                    sell_price = row[ticker]
+            # ---------------------------------
+            # SELL positions outside TOP N
+            # ---------------------------------
+            for t, pos in list(positions.items()):
+                if t not in selected:
+                    buy_price = pos["buy_price"]
+                    sell_price = row[t]
                     pnl = (sell_price - buy_price) / buy_price * 100
 
-                    trades.append([ticker, positions[ticker]["buy_date"], date, pnl])
-                    equity += positions[ticker]["amount"] * (sell_price / buy_price)
-                    del positions[ticker]
+                    trades.append([t, pos["buy_date"], date, pnl])
+                    cash += pos["amount"] * sell_price
+                    del positions[t]
 
-            # BUY topN allocations
-            target_per_position = equity / TOP_N
+            # ---------------------------------
+            # BUY NEW POSITIONS
+            # ---------------------------------
+            if cash > 0:
+                allocation = cash / TOP_N
 
-            for ticker in topN:
-                price = row[ticker]
-                amount = target_per_position / price
+                for t in selected:
+                    price = row[t]
+                    amount = allocation / price
+                    positions[t] = {
+                        "buy_date": date,
+                        "buy_price": price,
+                        "amount": amount
+                    }
 
-                positions[ticker] = {
-                    "buy_date": date,
-                    "buy_price": price,
-                    "amount": amount
-                }
+                cash = 0  # all invested
 
-        # record equity curve
-        total = 0
+        # --------------------------
+        # EQUITY CALCULATION
+        # --------------------------
+        portfolio_value = cash
         for t, pos in positions.items():
-            total += pos["amount"] * row[t]
+            portfolio_value += pos["amount"] * row[t]
 
-        equity_curve.append([date, equity + total])
+        equity_curve.append([date, portfolio_value])
 
-    # --- SAVE REPORTS ---
+    # -----------------------------------------------------------------
+    # SAVE RESULTS
+    # -----------------------------------------------------------------
     eq_df = pd.DataFrame(equity_curve, columns=["date", "equity"])
     eq_df.to_csv("reports/backtest_equity.csv", index=False)
 
     trades_df = pd.DataFrame(trades, columns=["ticker", "buy_date", "sell_date", "pnl_pct"])
     trades_df.to_csv("reports/backtest_trades.csv", index=False)
 
-    # --- METRICS ---
+    # =================================================================
+    # METRICS
+    # =================================================================
     print("\n=== BACKTEST RESULTS ===\n")
 
     num_trades = len(trades_df)
-    win_rate = (trades_df["pnl_pct"] > 0).mean() * 100 if num_trades > 0 else 0
-    avg_pnl = trades_df["pnl_pct"].mean() if num_trades > 0 else 0
-    best_trade = trades_df["pnl_pct"].max() if num_trades > 0 else 0
-    worst_trade = trades_df["pnl_pct"].min() if num_trades > 0 else 0
+    win_rate = (trades_df["pnl_pct"] > 0).mean() * 100 if num_trades else 0
+    avg_pnl = trades_df["pnl_pct"].mean() if num_trades else 0
+    best_trade = trades_df["pnl_pct"].max() if num_trades else 0
+    worst_trade = trades_df["pnl_pct"].min() if num_trades else 0
 
     eq_vals = eq_df["equity"].values
-    max_eq = np.maximum.accumulate(eq_vals)
-    dd = (eq_vals - max_eq) / max_eq * 100
+    max_running = np.maximum.accumulate(eq_vals)
+    dd = (eq_vals - max_running) / max_running * 100
     max_dd = dd.min()
 
     total_return = (eq_vals[-1] / eq_vals[0] - 1) * 100
@@ -136,7 +149,7 @@ def run_backtest():
     print(f"Maksymalne DD:          {max_dd:.2f}%")
     print(f"Całkowity zwrot:        {total_return:.2f}%")
 
-    print("\nPliki zapisane w folderze /reports/:")
+    print("\nPliki wygenerowane w /reports/:")
     print(" - backtest_equity.csv")
     print(" - backtest_trades.csv\n")
 
