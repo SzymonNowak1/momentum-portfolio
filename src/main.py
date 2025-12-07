@@ -78,7 +78,7 @@ print("[B] TOP5 momentum:", top5)
     # ========================================================
     # 3. FX RATES
     # ========================================================
-    fx_row = load_fx_row()
+fx_row = load_fx_row()
     print("[FX] Dzisiejsze kursy:")
     print(fx_row, "\n")
 
