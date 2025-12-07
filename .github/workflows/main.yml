@@ -1,0 +1,31 @@
+name: Weekly Rebalance Test
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'   # poniedziałek 07:00 UTC
+  workflow_dispatch:       # ręczne odpalenie z poziomu GitHub UI
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run main.py
+        run: python src/main.py > reports/last_report.txt
+
+      - name: Commit report
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add reports/last_report.txt
+          git commit -m "Update report" || echo "No changes"
+          git push
