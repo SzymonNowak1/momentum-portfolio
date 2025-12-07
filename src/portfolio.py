@@ -167,3 +167,47 @@ def execute_sell_orders(today, sell_list, price_data, fx_row, regime):
               f"({price_pln:.2f} PLN)")
 
     conn.close()
+
+# ==============================================================
+# BUILD TARGET ALLOCATION (MONTHLY REBALANCING)
+# ==============================================================
+
+def build_target_allocation(today, top5, total_equity_pln, fx_row):
+    """
+    Creates a dataframe with target allocation:
+        - top5 = list of tickers selected today
+        - equal weight (1/5)
+        - total_equity_pln — total portfolio value including cash
+        - price_data must be loaded earlier from main.py
+
+    Returns DataFrame:
+        ticker | weight | target_value_pln | currency | target_value_ccy
+    """
+    if not top5:
+        print("[ALLOC] No tickers → empty allocation.")
+        return pd.DataFrame()
+
+    weight = 1.0 / len(top5)
+    target_value = total_equity_pln * weight
+
+    rows = []
+    for t in top5:
+        currency = "USD" if not t.endswith(".PL") else "PLN"
+
+        # FX
+        if currency == "USD":
+            fx = fx_row["USD"]
+        elif currency == "EUR":
+            fx = fx_row["EUR"]
+        else:
+            fx = 1.0
+
+        rows.append({
+            "ticker": t,
+            "currency": currency,
+            "weight": weight,
+            "target_value_pln": target_value,
+            "target_value_ccy": target_value / fx
+        })
+
+    return pd.DataFrame(rows)
