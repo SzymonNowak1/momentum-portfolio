@@ -104,10 +104,10 @@ def main():
     equity_pln = estimate_equity_pln(positions_df, fx_today_row)
     print(f"\n[PORTFOLIO] Estimated total equity: {equity_pln:,.2f} PLN")
 
-    # --- 6. Czy dziś jest dzień dopłaty? ---
-    if is_contribution_day(today):
-        print("\n[CONTRIBUTION] Today is configured as a contribution day (10th or shifted).")
-        print("  (Na razie tylko informacja – logika dopłaty i inwestowania dodamy w kolejnym kroku.)")
+    # --- 6. Czy dziś jest dzień dopłaty / rebalansu? ---
+    is_contrib = is_contribution_day(today)
+    if is_contrib:
+        print("\n[CONTRIBUTION] Today IS a contribution & rebalance day (10th or shifted).")
     else:
         print("\n[CONTRIBUTION] Today is NOT a contribution day.")
 
