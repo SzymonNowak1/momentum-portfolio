@@ -1,0 +1,30 @@
+name: Run Backtest
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas numpy
+
+      - name: Run backtest
+        run: python src/backtest_simple.py
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest_reports
+          path: reports/
