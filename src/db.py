@@ -1,83 +1,121 @@
-from __future__ import annotations
-
 import sqlite3
 from pathlib import Path
-from typing import Optional
+
+DB_PATH = Path("data/portfolio.db")
 
 
-# Ścieżka do bazy: <repo_root>/data/portfolio.db
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "portfolio.db"
+def init_db():
+    """Initialize SQLite database with required tables."""
+    DB_PATH.parent.mkdir(exist_ok=True)
 
-
-def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
-    """
-    Zwraca połączenie do bazy SQLite.
-    Tworzy katalog /data jeśli nie istnieje.
-    """
-    if db_path is None:
-        db_path = DB_PATH
-
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
-
-
-def init_db(conn: sqlite3.Connection | None = None) -> None:
-    """
-    Tworzy tabele, jeśli jeszcze nie istnieją.
-
-    Tabele:
-      - positions   – aktualne pozycje w portfelu
-      - trades      – historia transakcji (BUY/SELL)
-      - cash_flows  – dopłaty / wypłaty w PLN
-    """
-    close_after = False
-    if conn is None:
-        conn = get_connection()
-        close_after = True
-
+    conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    cur.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS positions (
-            ticker          TEXT PRIMARY KEY,
-            currency        TEXT NOT NULL,
-            units           REAL NOT NULL,
-            avg_price_ccy   REAL NOT NULL,
-            last_update     TEXT NOT NULL
-        );
+    # === OPEN POSITIONS ===
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS portfolio_positions (
+        ticker TEXT PRIMARY KEY,
+        currency TEXT,
+        quantity REAL,
+        avg_price REAL,
+        value_pln REAL,
+        opened_at TEXT
+    );
+    """)
 
-        CREATE TABLE IF NOT EXISTS trades (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            date            TEXT NOT NULL,   -- ISO YYYY-MM-DD HH:MM:SS
-            ticker          TEXT NOT NULL,
-            side            TEXT NOT NULL CHECK (side IN ('BUY','SELL')),
-            units           REAL NOT NULL,
-            price_ccy       REAL NOT NULL,
-            currency        TEXT NOT NULL,
-            fx              REAL NOT NULL,
-            value_pln       REAL NOT NULL
-        );
+    # === TRANSACTION HISTORY ===
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS portfolio_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT,
+        ticker TEXT,
+        side TEXT,
+        quantity REAL,
+        price_ccy REAL,
+        currency TEXT,
+        price_pln REAL,
+        regime TEXT,
+        note TEXT
+    );
+    """)
 
-        CREATE TABLE IF NOT EXISTS cash_flows (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            date            TEXT NOT NULL,   -- ISO YYYY-MM-DD
-            amount_pln      REAL NOT NULL,
-            type            TEXT NOT NULL CHECK (type IN ('DEPOSIT','WITHDRAW')),
-            note            TEXT
-        );
-        """
-    )
+    # === EQUITY HISTORY ===
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS portfolio_equity (
+        date TEXT PRIMARY KEY,
+        equity_pln REAL,
+        cash_pln REAL,
+        invested_pln REAL,
+        fx_usd REAL,
+        fx_eur REAL
+    );
+    """)
 
     conn.commit()
+    conn.close()
+    print("[DB] portfolio.db initialized (positions + history + equity).")
 
-    if close_after:
-        conn.close()
+
+# ==============================================================
+# Utility methods
+# ==============================================================
+
+def record_transaction(timestamp, ticker, side, quantity, price_ccy, currency,
+                       price_pln, regime, note=""):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO portfolio_history
+        (timestamp, ticker, side, quantity, price_ccy, currency, price_pln, regime, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (timestamp, ticker, side, quantity, price_ccy, currency,
+          price_pln, regime, note))
+
+    conn.commit()
+    conn.close()
 
 
-if __name__ == "__main__":
-    # test lokalny
-    init_db()
-    print(f"DB initialized at: {DB_PATH}")
+def update_position(ticker, currency, quantity, avg_price, value_pln, opened_at):
+    """Insert or update an open position."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO portfolio_positions 
+        (ticker, currency, quantity, avg_price, value_pln, opened_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(ticker) DO UPDATE SET
+            quantity = excluded.quantity,
+            avg_price = excluded.avg_price,
+            value_pln = excluded.value_pln,
+            opened_at = excluded.opened_at
+    """, (ticker, currency, quantity, avg_price, value_pln, opened_at))
+
+    conn.commit()
+    conn.close()
+
+
+def remove_position(ticker):
+    """Delete a position after SELL."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM portfolio_positions WHERE ticker=?", (ticker,))
+
+    conn.commit()
+    conn.close()
+
+
+def record_equity(date, equity_pln, cash_pln, invested_pln, fx_usd, fx_eur):
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT OR REPLACE INTO portfolio_equity
+        (date, equity_pln, cash_pln, invested_pln, fx_usd, fx_eur)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (date, equity_pln, cash_pln, invested_pln, fx_usd, fx_eur))
+
+    conn.commit()
+    conn.close()
