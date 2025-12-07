@@ -1,8 +1,8 @@
 import sqlite3
 from pathlib import Path
-from datetime import datetime
 
 DB_PATH = Path("data/portfolio.db")
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 # ==============================================================
@@ -50,6 +50,15 @@ def init_db():
         )
     """)
 
+    # Table with monthly contributions
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS contributions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            amount_pln REAL
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -59,12 +68,15 @@ def init_db():
 # ==============================================================
 
 def load_positions():
+    """Optional loader używany w niektórych modułach.
+       W portfolio_storage i tak mamy swój wrapper.
+    """
     conn = get_connection()
-    df = None
     try:
         import pandas as pd
         df = pd.read_sql("SELECT * FROM portfolio_positions", conn)
     except Exception:
+        import pandas as pd
         df = pd.DataFrame()
     conn.close()
     return df
